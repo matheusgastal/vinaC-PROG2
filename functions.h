@@ -16,6 +16,12 @@ struct membro {
     long loc;
 };
 
+
+struct diretorio {
+    struct membro *membros;
+    int total;
+};
+
 void insere_sem_compressao(char *archive, char **arquivos, int n);
 void lista_informacoes(char *archive);
 void extrai_arquivos(char *archive, char **arquivos, int n);
