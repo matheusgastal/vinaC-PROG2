@@ -2,31 +2,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <fcntl.h> 
+#include <fcntl.h>
+#include <unistd.h>
+#include <time.h>
 #include "functions.h"
 #include "lz.h"
-#include <unistd.h>
-#define MAX_MEMBROS 5
 
-long int get_tamanho(FILE *f){
-    fseek(f,0,SEEK_END);
+
+// Funções auxiliares
+
+long int get_tamanho(FILE *f) {
+    fseek(f, 0, SEEK_END);
     long int tam = ftell(f);
-    fseek(f,0,SEEK_SET);
+    fseek(f, 0, SEEK_SET);
     return tam;
 }
 
-void transfere_info(struct membro mb, struct membro diretorio[], int index, long int tam_membro, long int loc, char **arquivos){
-            strcpy(mb.nome, arquivos[index]);
-            mb.data_mod = time(NULL);
-            mb.ord = index;
-            mb.uid = getuid();
-            mb.tam_original = tam_membro;
-            mb.tam_disco = tam_membro;
-            mb.loc = loc;
-    
-            diretorio[index] = mb;
+void transfere_info(struct membro *mb, char *nome_arquivo, int index, long int tam_membro, long int loc) {
+    strcpy(mb->nome, nome_arquivo);
+    mb->data_mod = time(NULL);
+    mb->ord = index;
+    mb->uid = getuid();
+    mb->tam_original = tam_membro;
+    mb->tam_disco = tam_membro;
+    mb->loc = loc;
 }
-
 
 void mover_arquivo(FILE *archive, long origem, long destino, long tamanho) {
     if (tamanho <= 0 || origem == destino) return;
@@ -46,10 +46,8 @@ void mover_arquivo(FILE *archive, long origem, long destino, long tamanho) {
     free(buffer);
 }
 
-
 void insere_sem_compressao(char *archive, char **arquivos, int num) {
-    struct membro diretorio[MAX_MEMBROS]; 
-    int total_membros = 0;
+    struct diretorio dir = {NULL, 0};
 
     FILE *fp_archive = fopen(archive, "rb+");
     if (!fp_archive) {
@@ -63,18 +61,42 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
     long offset = 0;
     long int tam_archiver = get_tamanho(fp_archive);
 
-    if (tam_archiver > 0) {
-        // Lê diretório existente
-        fseek(fp_archive, -sizeof(struct membro) * MAX_MEMBROS, SEEK_END);
-        while (fread(&diretorio[total_membros], sizeof(struct membro), 1, fp_archive) == 1 &&
-               total_membros < MAX_MEMBROS) {
-            long fim = diretorio[total_membros].loc + diretorio[total_membros].tam_disco;
+    // Carrega diretório se existir
+    if (tam_archiver > sizeof(int)) {
+        int membros_anteriores;
+        fseek(fp_archive, -sizeof(int), SEEK_END);
+        fread(&membros_anteriores, sizeof(int), 1, fp_archive);
+
+        long int tam_dir = membros_anteriores * sizeof(struct membro) + sizeof(int);
+        fseek(fp_archive, tam_archiver - tam_dir, SEEK_SET);
+
+        dir.membros = malloc(membros_anteriores * sizeof(struct membro));
+        if (!dir.membros) {
+            perror("Erro ao alocar diretório");
+            fclose(fp_archive);
+            return;
+        }
+
+        fread(dir.membros, sizeof(struct membro), membros_anteriores, fp_archive);
+        dir.total = membros_anteriores;
+
+        for (int i = 0; i < dir.total; i++) {
+            long fim = dir.membros[i].loc + dir.membros[i].tam_disco;
             if (fim > offset) offset = fim;
-            total_membros++;
         }
     }
 
-    for (int i = 0; i < num && total_membros < MAX_MEMBROS; i++) {
+    // Realoca para adicionar novos membros
+    struct membro *tmp = realloc(dir.membros, (dir.total + num) * sizeof(struct membro));
+    if (!tmp) {
+        perror("Erro ao realocar diretório");
+        fclose(fp_archive);
+        free(dir.membros);
+        return;
+    }
+    dir.membros = tmp;
+
+    for (int i = 0; i < num; i++) {
         FILE *fp_membro = fopen(arquivos[i], "rb");
         if (!fp_membro) {
             perror("Erro ao abrir membro");
@@ -93,31 +115,31 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
         fclose(fp_membro);
 
         int idx_existente = -1;
-        for (int j = 0; j < total_membros; j++) {
-            if (strcmp(arquivos[i], diretorio[j].nome) == 0) {
+        for (int j = 0; j < dir.total; j++) {
+            if (strcmp(arquivos[i], dir.membros[j].nome) == 0) {
                 idx_existente = j;
                 break;
             }
         }
 
         if (idx_existente != -1) {
-            long tam_antigo = diretorio[idx_existente].tam_disco;
+            long tam_antigo = dir.membros[idx_existente].tam_disco;
             long diff = tam_novo - tam_antigo;
-            long local = diretorio[idx_existente].loc;
+            long local = dir.membros[idx_existente].loc;
 
             if (diff == 0) {
                 fseek(fp_archive, local, SEEK_SET);
                 fwrite(buffer, 1, tam_novo, fp_archive);
             } else {
                 if (diff > 0) {
-                    for (int k = total_membros - 1; k > idx_existente; k--) {
-                        mover_arquivo(fp_archive, diretorio[k].loc, diretorio[k].loc + diff, diretorio[k].tam_disco);
-                        diretorio[k].loc += diff;
+                    for (int k = dir.total - 1; k > idx_existente; k--) {
+                        mover_arquivo(fp_archive, dir.membros[k].loc, dir.membros[k].loc + diff, dir.membros[k].tam_disco);
+                        dir.membros[k].loc += diff;
                     }
                 } else {
-                    for (int k = idx_existente + 1; k < total_membros; k++) {
-                        mover_arquivo(fp_archive, diretorio[k].loc, diretorio[k].loc + diff, diretorio[k].tam_disco);
-                        diretorio[k].loc += diff;
+                    for (int k = idx_existente + 1; k < dir.total; k++) {
+                        mover_arquivo(fp_archive, dir.membros[k].loc, dir.membros[k].loc + diff, dir.membros[k].tam_disco);
+                        dir.membros[k].loc += diff;
                     }
                     ftruncate(fileno(fp_archive), tam_archiver + diff);
                 }
@@ -126,46 +148,46 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
                 fwrite(buffer, 1, tam_novo, fp_archive);
             }
 
-            diretorio[idx_existente].tam_disco = tam_novo;
-            diretorio[idx_existente].tam_original = tam_novo;
-            diretorio[idx_existente].data_mod = time(NULL);
-            diretorio[idx_existente].uid = getuid();
+            dir.membros[idx_existente].tam_disco = tam_novo;
+            dir.membros[idx_existente].tam_original = tam_novo;
+            dir.membros[idx_existente].data_mod = time(NULL);
+            dir.membros[idx_existente].uid = getuid();
 
         } else {
             fseek(fp_archive, offset, SEEK_SET);
             fwrite(buffer, 1, tam_novo, fp_archive);
 
-            struct membro m;
-            transfere_info(m, diretorio, total_membros, tam_novo, offset, arquivos);
+            transfere_info(&dir.membros[dir.total], arquivos[i], dir.total, tam_novo, offset);
             offset += tam_novo;
-            total_membros++;
+            dir.total++;
         }
 
         free(buffer);
     }
 
-    // Escreve diretório atualizado no final do arquivo
+    // Escreve diretório atualizado
     fseek(fp_archive, offset, SEEK_SET);
-    fwrite(diretorio, sizeof(struct membro), MAX_MEMBROS, fp_archive);
+    fwrite(dir.membros, sizeof(struct membro), dir.total, fp_archive);
+    fwrite(&dir.total, sizeof(int), 1, fp_archive);
 
+    free(dir.membros);
     fclose(fp_archive);
 }
 
 void lista_informacoes(char *archiver) {
-    FILE *archive = fopen(archiver, "rb+");
+    FILE *archive = fopen(archiver, "rb");
     if (archive == NULL) {
-        perror("Erro ao abrir archiver.\n");
+        perror("Erro ao abrir archive");
         return;
     }
 
     long int tam_arquivo = get_tamanho(archive);
-    if ((unsigned long int)tam_arquivo < sizeof(int)) {
-        printf("Archiver vazio!\n");
+    if (tam_arquivo < sizeof(int)) {
+        printf("Archive vazio!\n");
         fclose(archive);
         return;
     }
 
-    // Lê quantidade de arquivos
     int qntd_arquivos;
     fseek(archive, -sizeof(int), SEEK_END);
     fread(&qntd_arquivos, sizeof(int), 1, archive);
