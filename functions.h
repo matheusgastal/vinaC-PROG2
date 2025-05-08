@@ -3,6 +3,7 @@
 
 #define MAX_NOME 8
 
+#include <unistd.h>
 #include <time.h>
 
 struct membro {
