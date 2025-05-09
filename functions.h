@@ -1,7 +1,7 @@
 #ifndef FUNCTIONS_H
 #define FUNCTIONS_H
 
-#define MAX_NOME 8
+#define MAX_NOME 1024
 
 #include <unistd.h>
 #include <time.h>
@@ -24,7 +24,11 @@ struct diretorio {
 
 void insere_sem_compressao(char *archive, char **arquivos, int n);
 void lista_informacoes(char *archive);
-void extrai_arquivos(char *archive, char **arquivos, int n);
+void move_membro(char *archive, char *nome_mover, char *nome_target);
+void extrai_arquivos(char *archive, char **arquivos, int num);
 void remove_arquivos(char *archive, char **arquivos, int n);
-
+void insere_compactado(char *archive, char **arquivos, int num);
 #endif
+
+
+

@@ -6,9 +6,20 @@
 #include <fcntl.h>
 #include "functions.h"
 
+void print_usage() {
+    fprintf(stderr, "Uso: vinac <opcao> <archive> [membro1 membro2 ...]\n");
+    fprintf(stderr, "Opções disponíveis:\n");
+    fprintf(stderr, "  -ip         Inserir membros sem compressão\n");
+    fprintf(stderr, "  -ic         Inserir membros com compressão\n");
+    fprintf(stderr, "  -m          Mover membro para depois de outro\n");
+    fprintf(stderr, "  -x          Extrair membros\n");
+    fprintf(stderr, "  -r          Remover membros\n");
+    fprintf(stderr, "  -c          Listar conteúdo do archive\n");
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        perror("Argumentos insuficientes");
+        print_usage();
         return -1;
     }
 
@@ -34,50 +45,50 @@ int main(int argc, char *argv[]) {
     else if (strcmp(argv[1], "-c") == 0)
         opcao = 6;
 
+    if (opcao == -1) {
+        fprintf(stderr, "Opção inválida: %s\n", argv[1]);
+        print_usage();
+        return -1;
+    }
+
     switch (opcao) {
         case 1:
-            printf("Executando insercao sem compressao (-ip)!\n");
+            printf("Executando inserção sem compressão...\n");
             insere_sem_compressao(argv[2], arquivos, qtd_arquivos);
             break;
 
         case 2:
-            // A ser implementado: insere_com_compressao(argv[2], arquivos, qtd_arquivos);
-            printf("Inserção com compressão ainda não implementada.\n");
+            printf("Executando inserção com compressão...\n");
+            insere_compactado(argv[2], arquivos, qtd_arquivos);
             break;
 
         case 3:
-            printf("Executando movimentacao de membro (-m)!\n");
+            printf("Executando movimentação de membro...\n");
             if (argc == 4) {
-                // mover para o início
                 move_membro(argv[2], argv[3], NULL);
             } else if (argc == 5) {
-                // mover depois de outro membro
                 move_membro(argv[2], argv[3], argv[4]);
             } else {
-                fprintf(stderr, "Uso incorreto da opção -m. Exemplo:\n");
-                fprintf(stderr, "vinac -m archive.vc membro_a_mover [membro_target]\n");
+                fprintf(stderr, "Uso incorreto da opção -m.\n");
+                print_usage();
                 return -1;
             }
             break;
 
         case 4:
-            printf("Executando funcao de extracao (-x)!\n");
-            //extrai_arquivos(argv[2], arquivos, qtd_arquivos);
+            printf("Executando extração de membros...\n");
+            extrai_arquivos(argv[2], arquivos, qtd_arquivos);
             break;
 
         case 5:
-            printf("Executando funcao de remocao (-r)!\n");
-            //remove_arquivos(argv[2], arquivos, qtd_arquivos);
+            printf("Executando remoção de membros...\n");
+            remove_arquivos(argv[2], arquivos, qtd_arquivos);
             break;
 
         case 6:
-            printf("Executando funcao de listagem (-c)!\n");
+            printf("Executando listagem do conteúdo...\n");
             lista_informacoes(argv[2]);
             break;
-
-        default:
-            printf("Opcao invalida!\n");
-            return -1;
     }
 
     return 0;
