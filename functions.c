@@ -268,6 +268,14 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
         return;
     }
 
+    if(nome_target == NULL){
+        printf("mover arquivo %s para o comeco\n", nome_mover);
+    }
+    else{
+        printf("vamos mover o arquivo %s para depois do arquivo %s\n", nome_mover, nome_target);
+    }
+
+
     long tam_total = get_tamanho(fp);
     long tam_dir = sizeof(struct membro) * total + sizeof(int);
     long inicio_dir = tam_total - tam_dir;
@@ -282,12 +290,11 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
     fseek(fp, inicio_dir, SEEK_SET);
     fread(membros, sizeof(struct membro), total, fp);
 
-    // Localiza os índices
     int idx_mover = -1, idx_target = -1;
     for (int i = 0; i < total; i++) {
-        if (strcmp(membros[i].nome, nome_mover) == 0) 
+        if (strcmp(membros[i].nome, nome_mover) == 0)
             idx_mover = i;
-        if (nome_target && strcmp(membros[i].nome, nome_target) == 0) 
+        if (nome_target && strcmp(membros[i].nome, nome_target) == 0)
             idx_target = i;
     }
 
@@ -305,26 +312,43 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
         return;
     }
 
-    // Determina nova ordem
+    // Salva membro a mover
     struct membro mover = membros[idx_mover];
-    int nova_pos = (nome_target == NULL) ? 0 : idx_target + 1;
 
-    // Remove da posição atual e insere na nova
-    for (int i = idx_mover; i < total - 1; i++){
-        membros[i] = membros[i + 1];
-    } 
-    for (int i = total - 1; i > nova_pos; i--) {
+    // Remove e insere
+    for(int i = idx_mover; i< total - 1; i++){
+        membros[i] = membros[i+1];
+    }
+
+    int insert_pos;
+
+    if(nome_target == NULL){
+        insert_pos = 0;
+    }
+    else{
+        insert_pos = idx_target + 1;
+        if(idx_mover < insert_pos){
+            insert_pos--;
+        }
+    }
+
+    for(int i = total -1; i > insert_pos; i--){
         membros[i] = membros[i - 1];
     }
-    membros[nova_pos] = mover;
 
-    // Atualiza campo .ord
-    for (int i = 0; i < total; i++) {
+    membros[insert_pos] = mover;
+
+    // Atualiza .ord
+    for (int i = 0; i < total; i++)
         membros[i].ord = i;
-    }
-    
-    // Reescreve a área de dados na nova ordem
-    char *buffer = malloc(mover.tam_disco);
+
+    // Achar maior membro para alocar buffer seguro
+    long max_size = 0;
+    for (int i = 0; i < total; i++)
+        if (membros[i].tam_disco > max_size)
+            max_size = membros[i].tam_disco;
+
+    char *buffer = malloc(max_size);
     if (!buffer) {
         perror("Erro ao alocar buffer temporário");
         free(membros);
@@ -334,27 +358,41 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
 
     FILE *temp = tmpfile();
     long offset = 0;
+
     for (int i = 0; i < total; i++) {
         fseek(fp, membros[i].loc, SEEK_SET);
-        fread(buffer, 1, membros[i].tam_disco, fp);
+        if (fread(buffer, 1, membros[i].tam_disco, fp) != membros[i].tam_disco) {
+            perror("Erro ao ler membro");
+            free(buffer);
+            free(membros);
+            fclose(fp);
+            fclose(temp);
+            return;
+        }
 
-        fwrite(buffer, 1, membros[i].tam_disco, temp);
+        if (fwrite(buffer, 1, membros[i].tam_disco, temp) != membros[i].tam_disco) {
+            perror("Erro ao escrever no temporário");
+            free(buffer);
+            free(membros);
+            fclose(fp);
+            fclose(temp);
+            return;
+        }
+
         membros[i].loc = offset;
         offset += membros[i].tam_disco;
     }
 
-    // Trunca o arquivo original
+    // Reescreve archive
     ftruncate(fileno(fp), 0);
     fseek(fp, 0, SEEK_SET);
     fseek(temp, 0, SEEK_SET);
 
-    // Copia dados reorganizados de volta para o archive
-    fseek(temp, 0, SEEK_SET);
-    while ((offset = fread(buffer, 1, mover.tam_disco, temp)) > 0) {
-        fwrite(buffer, 1, offset, fp);
+    long bytes_read;
+    while ((bytes_read = fread(buffer, 1, max_size, temp)) > 0) {
+        fwrite(buffer, 1, bytes_read, fp);
     }
 
-    // Reescreve o diretório atualizado
     fwrite(membros, sizeof(struct membro), total, fp);
     fwrite(&total, sizeof(int), 1, fp);
 
