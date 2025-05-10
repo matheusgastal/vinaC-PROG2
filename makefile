@@ -1,7 +1,7 @@
 # Definição das variáveis
 CC = gcc
 FLAGS = -std=c99 -Wall
-OBJ = main.o functions.o
+OBJ = main.o functions.o lz.o
 TARGET = vinac
 
 # Regra principal para gerar o executável
@@ -13,8 +13,12 @@ main.o: main.c functions.h
 	$(CC) $(FLAGS) -c main.c
 
 # Regra para compilar functions.c em functions.o
-functions.o: functions.c functions.h
+functions.o: functions.c functions.h lz.h
 	$(CC) $(FLAGS) -c functions.c
+
+# Regra para compilar lz.c em lz.o
+lz.o: lz.c lz.h
+	$(CC) $(FLAGS) -c lz.c
 
 # Limpeza dos arquivos objetos e do executável
 clean:
