@@ -4,7 +4,10 @@ FLAGS = -std=c99 -Wall
 OBJ = main.o functions.o lz.o
 TARGET = vina
 
-# Regra principal para gerar o executável
+# Regra padrão para gerar o executável
+all: $(TARGET)
+
+# Regra para gerar o executável
 $(TARGET): $(OBJ)
 	$(CC) $(FLAGS) $(OBJ) -o $(TARGET)
 
