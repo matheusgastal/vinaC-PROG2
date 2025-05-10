@@ -2,7 +2,7 @@
 CC = gcc
 FLAGS = -std=c99 -Wall
 OBJ = main.o functions.o lz.o
-TARGET = vinac
+TARGET = vina
 
 # Regra principal para gerar o executável
 $(TARGET): $(OBJ)
