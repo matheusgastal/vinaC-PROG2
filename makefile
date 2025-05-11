@@ -1,6 +1,6 @@
 # Definição das variáveis
 CC = gcc
-FLAGS = -std=c99 -Wall
+FLAGS = -std=c99 -D_POSIX_C_SOURCE=200809L -Wall
 OBJ = main.o functions.o lz.o
 TARGET = vina
 
