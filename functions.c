@@ -10,7 +10,7 @@
 
 
 // Funções auxiliares
-int acha_iguais(int i, char **arquivos, struct diretorio dir){
+int acha_iguais(int i, char **arquivos, struct diretorio dir){ //acha arquivos iguais, usado para inserção
     int idx_existente = -1;
         for (int j = 0; j < dir.total; j++) {
             if (strcmp(arquivos[i], dir.membros[j].nome) == 0) {
@@ -21,7 +21,7 @@ int acha_iguais(int i, char **arquivos, struct diretorio dir){
         return idx_existente;
 }
 
-void imprime_info(struct membro mb){ 
+void imprime_info(struct membro mb){  //imprime todas as informacoes do membro
         printf("Nome: %s\n", mb.nome);
         printf("UID: %d\n", mb.uid);
         printf("Tamanho Original: %ld bytes\n", mb.tam_original);
@@ -31,7 +31,7 @@ void imprime_info(struct membro mb){
         printf("-----------------------------------------------------\n");
 }
 
-long int get_tamanho(FILE *f) {
+long int get_tamanho(FILE *f) { //retorna o tamanho do File
     fseek(f, 0, SEEK_END);
     long int tam = ftell(f);
     fseek(f,0,SEEK_SET);
@@ -39,7 +39,7 @@ long int get_tamanho(FILE *f) {
 }
 
 
-int conta_membros_no_archive(const char *archive) {
+int conta_membros_no_archive(const char *archive) { //conta quantos membros estao no archiver
     FILE *fp = fopen(archive, "rb");
     if (!fp) {
         perror("Erro ao abrir archive");
@@ -66,7 +66,7 @@ int conta_membros_no_archive(const char *archive) {
 }
 
 
-void transfere_info(struct membro *mb, char *nome_arquivo, int index, long int tam_original, long int tam_disco, long int loc) {
+void transfere_info(struct membro *mb, char *nome_arquivo, int index, long int tam_original, long int tam_disco, long int loc) { 
     strcpy(mb->nome, nome_arquivo);
     mb->data_mod = time(NULL);
     mb->ord = index;
@@ -77,7 +77,7 @@ void transfere_info(struct membro *mb, char *nome_arquivo, int index, long int t
 }
 
 
-void mover_arquivo(FILE *archive, long origem, long destino, long tamanho) {
+void mover(FILE *archive, long origem, long destino, long tamanho) { 
     if (tamanho <= 0 || origem == destino) return;
 
     char *buffer = malloc(tamanho);
@@ -116,7 +116,7 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
         return;
     }
 
-    if (membros_anteriores > 0) {
+    if (membros_anteriores > 0) { //se ja existem membros no archive
         long int tam_dir = membros_anteriores * sizeof(struct membro) + sizeof(int);
         fseek(fp_archive, tam_archiver - tam_dir, SEEK_SET);
 
@@ -158,6 +158,7 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
         if (!buffer) {
             perror("Erro de alocação");
             fclose(fp_membro);
+            
             continue;
         }
 
@@ -177,12 +178,12 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
             } else {
                 if (diff > 0) {
                     for (int k = dir.total - 1; k > idx_existente; k--) {
-                        mover_arquivo(fp_archive, dir.membros[k].loc, dir.membros[k].loc + diff, dir.membros[k].tam_disco);
+                        mover(fp_archive, dir.membros[k].loc, dir.membros[k].loc + diff, dir.membros[k].tam_disco);
                         dir.membros[k].loc += diff;
                     }
                 } else {
                     for (int k = idx_existente + 1; k < dir.total; k++) {
-                        mover_arquivo(fp_archive, dir.membros[k].loc, dir.membros[k].loc + diff, dir.membros[k].tam_disco);
+                        mover(fp_archive, dir.membros[k].loc, dir.membros[k].loc + diff, dir.membros[k].tam_disco);
                         dir.membros[k].loc += diff;
                     }
                     ftruncate(fileno(fp_archive), tam_archiver + diff);
@@ -196,8 +197,8 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
             dir.membros[idx_existente].tam_original = tam_novo;
             dir.membros[idx_existente].data_mod = time(NULL);
             dir.membros[idx_existente].uid = getuid();
-
-        } else {
+ 
+        } else { // se nao existem membros no archive, so insere no fim 
             fseek(fp_archive, offset, SEEK_SET);
             fwrite(buffer, 1, tam_novo, fp_archive);
 
@@ -209,7 +210,7 @@ void insere_sem_compressao(char *archive, char **arquivos, int num) {
         free(buffer);
     }
 
-    // Escreve diretório atualizado
+    // escreve diretório atualizado
     fseek(fp_archive, offset, SEEK_SET);
     fwrite(dir.membros, sizeof(struct membro), dir.total, fp_archive);
     fwrite(&dir.total, sizeof(int), 1, fp_archive);
@@ -273,7 +274,7 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
         return;
     }
 
-    if(nome_target == NULL){
+    if(nome_target == NULL){ //arquivo mover para inicio
         printf("Movendo arquivo %s para o comeco...\n", nome_mover);
     }
     else{
@@ -297,9 +298,9 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
 
     int idx_mover = -1, idx_target = -1;
     for (int i = 0; i < total; i++) {
-        if (strcmp(membros[i].nome, nome_mover) == 0)
+        if (strcmp(membros[i].nome, nome_mover) == 0) //acha o indice do arquivo que queremos mover para depois do target
             idx_mover = i;
-        if (nome_target && strcmp(membros[i].nome, nome_target) == 0)
+        if (nome_target && strcmp(membros[i].nome, nome_target) == 0) //acha o indice do arquivo target
             idx_target = i;
     }
 
@@ -319,7 +320,7 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
 
     struct membro mover = membros[idx_mover];
 
-    for(int i = idx_mover; i< total - 1; i++){
+    for(int i = idx_mover; i< total - 1; i++){ //atualiza localizacao dentro de membros (indice)
         membros[i] = membros[i+1];
     }
 
@@ -385,7 +386,7 @@ void move_membro(char *archive, char *nome_mover, char *nome_target) {
         offset += membros[i].tam_disco;
     }
 
-    // Reescreve archive
+    // eeescreve archive
     ftruncate(fileno(fp), 0);
     fseek(fp, 0, SEEK_SET);
     fseek(temp, 0, SEEK_SET);
