@@ -1,28 +1,20 @@
 # Definição das variáveis
-CC = gcc
 FLAGS = -std=c99 -D_POSIX_C_SOURCE=200809L -Wall
-OBJ = main.o functions.o lz.o
-TARGET = vina
 
 # Regra padrão para gerar o executável
-all: $(TARGET)
+all: vina
 
-# Regra para gerar o executável
-$(TARGET): $(OBJ)
-	$(CC) $(FLAGS) $(OBJ) -o $(TARGET)
+vina: main.o functions.o lz.o
+	gcc $(FLAGS) main.o functions.o lz.o -o vina
 
-# Regra para compilar main.c em main.o
 main.o: main.c functions.h
-	$(CC) $(FLAGS) -c main.c
+	gcc $(FLAGS) -c main.c
 
-# Regra para compilar functions.c em functions.o
 functions.o: functions.c functions.h lz.h
-	$(CC) $(FLAGS) -c functions.c
+	gcc $(FLAGS) -c functions.c
 
-# Regra para compilar lz.c em lz.o
 lz.o: lz.c lz.h
-	$(CC) $(FLAGS) -c lz.c
+	gcc $(FLAGS) -c lz.c
 
-# Limpeza dos arquivos objetos e do executável
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f main.o functions.o lz.o vina
